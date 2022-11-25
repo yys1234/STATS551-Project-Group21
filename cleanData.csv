@@ -1,4 +1,4 @@
-,flightDate,travelDuration,isOneElapsedDays,isBasicEconomy,baseFare,seatsRemaining,isOtherEquipment,isFirstCabin,searchDaysBeforeDepartue,departureTimeInMin,airlineName_American Airlines,airlineName_Delta,airlineName_Spirit Airlines
+,flightDate,travelDuration,isOneElapsedDays,isBasicEconomy,baseFare,seatsRemaining,isOtherEquipment,isFirstCabin,searchDaysBeforeDeparture,departureTimeInMin,airlineName_American Airlines,airlineName_Delta,airlineName_Spirit Airlines
 2,2022-04-17,186,0.0,0.0,140.0,0,1.0,0.0,1,550,0.0,0.0,1.0
 3,2022-04-17,178,0.0,0.0,262.33,2,1.0,0.0,1,859,0.0,1.0,0.0
 4,2022-04-17,181,0.0,0.0,262.33,7,1.0,0.0,1,521,0.0,1.0,0.0
