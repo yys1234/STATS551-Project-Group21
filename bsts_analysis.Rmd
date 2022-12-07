@@ -1,0 +1,107 @@
+---
+title: "BSTS Analysis of Flight Prices"
+author: "Xingjian Zhang"
+date: "2022-12-06"
+output: html_document
+---
+
+```{r}
+library(tidyverse, quietly=TRUE)
+library(bsts, quietly=TRUE)
+
+data <- read.csv("./time_series.csv")
+data$flightDate <- as.Date(data$flightDate)
+X <- data$flightDate
+Y <- data$baseFare
+
+n_test <- 30
+n_train <- length(Y) - n_test
+
+X_train <- X[1:n_train]
+X_test <- X[n_train+1:length(X)][1:n_test]
+Y_train <- Y[1:n_train]
+Y_test <- Y[n_train+1:length(Y)][1:n_test]
+plot(X, Y, type="l", xlab="Time", ylab="Base Price", ylim=c(0,300))
+```
+
+```{r}
+# Create BSTS model
+model_components <- list()
+
+# Local Linear Trend - 4 Priors
+std_y=sdy <- sd(Y_train, na.rm=TRUE)
+
+## The prior distribution says that both sigma is small, and can be no
+## larger than the sample standard deviation of the time series
+## being modeled.
+level_sigma_prior=SdPrior(sigma.guess=0.01*std_y, upper.limit=std_y)
+slope_sigma_prior=SdPrior(sigma.guess=0.01*std_y, upper.limit=std_y)
+
+## The mean of the initial level is the first observation.
+initial_level_prior=NormalPrior(mu=Y_train[1], sigma=std_y)
+
+## Since y is actually provided, set the mean of the initial slope to
+## the slope of a line connecting the first and last points of y.
+initial_slope_prior=NormalPrior(mu=(Y_train[n_train]-Y_train[1])/n_train, sigma=std_y)
+
+## Compile model
+model_components <- AddLocalLinearTrend(model_components,
+                                        y=Y_train,
+                                        level.sigma.prior=level_sigma_prior,
+                                        slope.sigma.prior=slope_sigma_prior,
+                                        initial.level.prior=initial_level_prior,
+                                        initial.slope.prior=initial_slope_prior)
+
+# Seasonal Model - 2 Priors
+
+## The prior distribution says that sigma is small, and can be no
+## larger than the sample standard deviation of the time series
+## being modeled.
+sigma_prior <- SdPrior(0.01 * std_y, upper.limit=std_y)
+
+## We set a vague prior for initial state.
+initial_state_prior <- NormalPrior(0, std_y)
+
+## Compile Model
+model_components <- AddSeasonal(model_components,
+                                y=Y_train, nseasons=7,
+                                sigma.prior=sigma_prior,
+                                initial.state.prior=initial_state_prior)
+
+
+summary(model_components)
+```
+
+```{r}
+fit <- bsts(Y_train, model_components, niter=100000,timestamps=X_train)
+```
+```{r}
+burnin <- 1000 # Throw away first 500 
+tibble(
+  date=X_train,
+  trend=colMeans(fit$state.contributions[-(1:burnin),"trend",]),
+  seasonality=colMeans(fit$state.contributions[-(1:burnin),"seasonal.7.1",])) %>%
+  gather("component", "value", trend, seasonality) %>%
+  ggplot(aes(x=date, y= value)) + 
+    geom_line() + theme_bw() + 
+    theme(legend.title=element_blank()) + ylab("") + xlab("") +
+    facet_grid(component ~ ., scales="free") + guides(colour=FALSE) +
+    theme(axis.text.x=element_text(angle=-90, hjust=0))
+```
+```{r}
+pred <- predict(fit, horizon=n_test, burn=burnin, quantiles=c(.05, .95))
+Y_pred <- pred$mean
+print(sqrt(mean((Y_pred-Y_test)**2)))
+print(mean(abs(Y_pred-Y_test)))
+plot(pred, ylim=c(0, 300))
+```
+
+```{r}
+errors <- bsts.prediction.errors(fit)
+PlotDynamicDistribution(errors$in.sample, attr(errors, "timestamps"))
+```
+```{r}
+plot(fit, "residuals", burn=1000)
+plot(fit, "comp", burn=1000)
+plot(fit, "forecast.distribution", burn=1000)
+```
